@@ -34,13 +34,66 @@
       href="https://fonts.googleapis.com/css2?family=Karla&family=Markazi+Text:wght@500&display=swap"
       rel="stylesheet"
     />
+    
+    <style>
+      .booking-form {
+        background: #f8f9fa;
+        padding: 20px;
+        border-radius: 8px;
+        margin: 20px 0;
+      }
+      .booking-form input, .booking-form select {
+        width: 100%;
+        padding: 10px;
+        margin: 8px 0;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        box-sizing: border-box;
+      }
+      .booking-form button {
+        background: #495e57;
+        color: white;
+        padding: 12px 24px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 16px;
+      }
+      .booking-form button:hover {
+        background: #3d4f47;
+      }
+      .booking-form button:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+      }
+      .alert {
+        padding: 12px;
+        margin: 10px 0;
+        border-radius: 4px;
+      }
+      .alert-success {
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+      }
+      .alert-error {
+        background: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+      }
+      .alert-info {
+        background: #d1ecf1;
+        color: #0c5460;
+        border: 1px solid #bee5eb;
+      }
+    </style>
   </head>
 <header>
   <img src="{% static 'img/logo.png' %}" />
     </header>
     <nav>
       <ul>
-        <li><a href="{% url 'home' %}">Home</a></li>
+        <li><a href="{% url 'index' %}">Home</a></li>
         <li><a href="#">About</a></li>
         <li><a href="#">Menu</a></li>
         <li><a href="#">Book</a></li>
@@ -64,8 +117,13 @@
         Our menu consists of 12-15 seasonal items based on Italian, Greek, and Turkish culture.
       </p>
       <p>
-        <a href="#">See our new menu</a>
+        <a href="#" onclick="showMenu(); return false;">See our new menu</a>
       </p>
+      
+      <div id="menu-display" style="display: none; margin-top: 20px;">
+        <div id="menu-loading">Loading menu...</div>
+        <div id="menu-items"></div>
+      </div>
     </article>
     <article>
       <h2>Book a table</h2>
@@ -73,9 +131,28 @@
       <p>
         Reserve your table for an Italian, Greek, and Turkish dining experience.
       </p>
-      <p>
-        <a href="#">Book your table now</a>
-      </p>
+      
+      <div class="booking-form">
+        <div id="booking-message"></div>
+        
+        <form id="bookingForm">
+          <input type="text" id="name" name="name" placeholder="Your Name" required>
+          <input type="number" id="guests" name="no_of_guests" placeholder="Number of Guests" min="1" max="20" required>
+          <input type="datetime-local" id="booking_date" name="booking_date" required>
+          <button type="submit" id="submitBtn">Book Table</button>
+        </form>
+        
+        <div id="auth-section" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd;">
+          <h3>Need to login first?</h3>
+          <div id="login-form" style="display: none;">
+            <input type="text" id="username" placeholder="Username" required>
+            <input type="password" id="password" placeholder="Password" required>
+            <button onclick="login()">Login</button>
+          </div>
+          <button id="showLoginBtn" onclick="showLogin()">Login to Book</button>
+          <button id="showRegisterBtn" onclick="showRegister()">Register New Account</button>
+        </div>
+      </div>
     </article>
     <article>
       <h2>Opening Hours</h2>
@@ -98,5 +175,178 @@
       <p>Copyright {{ current_year }} Little Lemon</p>
     </article>
   </footer>
+
+  <script>
+    let authToken = localStorage.getItem('authToken');
+    
+    function showMessage(message, type = 'info') {
+      const messageDiv = document.getElementById('booking-message');
+      messageDiv.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+    }
+    
+    function showMenu() {
+      const menuDisplay = document.getElementById('menu-display');
+      const menuItems = document.getElementById('menu-items');
+      const menuLoading = document.getElementById('menu-loading');
+      
+      if (menuDisplay.style.display === 'none') {
+        menuDisplay.style.display = 'block';
+        menuLoading.style.display = 'block';
+        menuItems.innerHTML = '';
+        
+        // Fetch menu items
+        fetch('/menu/', {
+          headers: {
+            'Authorization': 'Token ' + authToken
+          }
+        })
+        .then(response => {
+          if (response.status === 401) {
+            throw new Error('Please login to view the menu');
+          }
+          return response.json();
+        })
+        .then(data => {
+          menuLoading.style.display = 'none';
+          if (data && data.length > 0) {
+            let menuHTML = '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-top: 20px;">';
+            data.forEach(item => {
+              menuHTML += `
+                <div style="border: 1px solid #ddd; padding: 15px; border-radius: 8px; background: white;">
+                  <h3 style="margin: 0 0 10px 0; color: #495e57;">${item.title}</h3>
+                  <p style="margin: 5px 0; font-weight: bold; color: #f4ce14;">$${item.price}</p>
+                  <p style="margin: 5px 0; font-size: 14px; color: #666;">Available: ${item.inventory} servings</p>
+                </div>
+              `;
+            });
+            menuHTML += '</div>';
+            menuItems.innerHTML = menuHTML;
+          } else {
+            menuItems.innerHTML = '<p>No menu items available at the moment.</p>';
+          }
+        })
+        .catch(error => {
+          menuLoading.style.display = 'none';
+          menuItems.innerHTML = `<p style="color: red;">Error loading menu: ${error.message}</p>`;
+        });
+      } else {
+        menuDisplay.style.display = 'none';
+      }
+    }
+    
+    function showLogin() {
+      document.getElementById('login-form').style.display = 'block';
+      document.getElementById('showLoginBtn').style.display = 'none';
+    }
+    
+    function showRegister() {
+      const registerData = {
+        username: prompt('Enter username:'),
+        email: prompt('Enter email:'),
+        password: prompt('Enter password (min 8 characters):'),
+        password_confirm: prompt('Confirm password:'),
+        first_name: prompt('Enter first name (optional):'),
+        last_name: prompt('Enter last name (optional):')
+      };
+      
+      if (registerData.username && registerData.email && registerData.password) {
+        fetch('/api/registration/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(registerData)
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (data.message) {
+            showMessage('Registration successful! You can now login.', 'success');
+          } else {
+            showMessage('Registration failed: ' + JSON.stringify(data), 'error');
+          }
+        })
+        .catch(error => {
+          showMessage('Registration error: ' + error.message, 'error');
+        });
+      }
+    }
+    
+    function login() {
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      
+      fetch('/api-token-auth/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username, password })
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.token) {
+          authToken = data.token;
+          localStorage.setItem('authToken', authToken);
+          showMessage('Login successful! You can now book a table and view the menu.', 'success');
+          document.getElementById('auth-section').style.display = 'none';
+        } else {
+          showMessage('Login failed. Please check your credentials.', 'error');
+        }
+      })
+      .catch(error => {
+        showMessage('Login error: ' + error.message, 'error');
+      });
+    }
+    
+    document.getElementById('bookingForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      
+      if (!authToken) {
+        showMessage('Please login first to book a table.', 'error');
+        return;
+      }
+      
+      const formData = {
+        name: document.getElementById('name').value,
+        no_of_guests: parseInt(document.getElementById('guests').value),
+        booking_date: document.getElementById('booking_date').value
+      };
+      
+      const submitBtn = document.getElementById('submitBtn');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Booking...';
+      
+      fetch('/api/bookings/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Token ' + authToken
+        },
+        body: JSON.stringify(formData)
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.id) {
+          showMessage(`Booking successful! Your booking ID is ${data.id}. We'll see you on ${formData.booking_date}!`, 'success');
+          document.getElementById('bookingForm').reset();
+        } else {
+          showMessage('Booking failed: ' + JSON.stringify(data), 'error');
+        }
+      })
+      .catch(error => {
+        showMessage('Booking error: ' + error.message, 'error');
+      })
+      .finally(() => {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Book Table';
+      });
+    });
+    
+    // Check if user is already logged in
+    if (authToken) {
+      document.getElementById('auth-section').style.display = 'none';
+      showMessage('You are logged in and can book a table and view the menu.', 'success');
+    }
+  </script>
 </body>
 </html>

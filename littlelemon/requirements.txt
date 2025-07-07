@@ -1,0 +1,9 @@
+# Django and Core Framework
+Django==4.2.23
+djangorestframework==3.16.0
+
+# Database
+mysqlclient==2.2.7
+
+# Authentication and Authorization
+djoser==2.3.1
